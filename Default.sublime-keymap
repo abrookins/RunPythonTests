@@ -1,0 +1,13 @@
+[
+    {
+        "keys": ["ctrl+z", "t"],
+        "command": "run_django_test_method",
+        "context": [{"key": "setting.command_mode"}]
+    },
+
+    {
+        "keys": ["ctrl+z", "T"],
+        "command": "run_django_test_suite",
+        "context": [{"key": "setting.command_mode"}]
+    }
+]
