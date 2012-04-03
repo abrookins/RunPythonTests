@@ -1,13 +1,24 @@
+# run_django_tests: Run the Django test the cursor resides within in an external
+# terminal emulator.
+#
+# This code is licensed under the MIT license and copyright (c) Andrew Brookins
+# <a.m.brookins@gmail.com>.
+#
+# The `TerminalSelector` class was extracted from the Sublime Terminal plugin
+# and modified slightly. All of Sublime Terminal is licensed under the MIT
+# license and copyright (c) 2011 Will Bond <will@wbond.net>
+
 import os
 import sublime
 import sublime_plugin
 import subprocess
-from terminal_selector import TerminalSelector
+import sys
 
 
-DJANGO_PROJECT_ROOT_SETTINGS = 'django_project_root'
+DJANGO_PROJECT_ROOT_SETTING = 'django_project_root'
 TEST_COMMAND_SETTING = 'django_test_command'
 TEST_MODULE_SETTING = 'django_test_module'
+TEST_TERMINAL_SETTING = 'django_test_terminal'
 VIRTUALENV_SETTING = 'django_virtualenv'
 
 
@@ -43,11 +54,12 @@ def get_current_code_entity(view, entity_selector):
     return current_entity
 
 
-def get_test_name(view, app_name, include_method=True):
+def get_test_name(view, include_method=True):
     test_cls = get_current_code_entity(view, 'entity.name.type.class')
     test_fn = get_current_code_entity(view, 'entity.name.function')
     app_name = find_file('models.py', view.file_name())
     test_name = None
+    print include_method
 
     # Possibly the app keeps models in a models/ directory.
     if app_name is None:
@@ -70,6 +82,54 @@ def get_test_name(view, app_name, include_method=True):
     return test_name
 
 
+class NotFoundError(Exception):
+    pass
+
+
+class TerminalSelector(object):
+    default = None
+
+    @staticmethod
+    def get(terminal=None):
+        package_dir = os.path.join(sublime.packages_path(), __name__)
+
+        if terminal:
+            dir, executable = os.path.split(terminal)
+            if not dir:
+                joined_terminal = os.path.join(package_dir, executable)
+                if os.path.exists(joined_terminal):
+                    terminal = joined_terminal
+                    if not os.access(terminal, os.X_OK):
+                        os.chmod(terminal, 0755)
+            return terminal
+
+        if TerminalSelector.default:
+            return TerminalSelector.default
+
+        default = None
+
+        if sys.platform == 'darwin':
+            default = os.path.join(package_dir, 'Terminal.sh')
+            if not os.access(default, os.X_OK):
+                os.chmod(default, 0755)
+        else:
+            ps = 'ps -eo comm | grep -E "gnome-session|ksmserver|' + \
+                'xfce4-session" | grep -v grep'
+            wm = [x.replace("\n", '') for x in os.popen(ps)]
+            if wm:
+                if wm[0] == 'gnome-session':
+                    default = 'gnome-terminal'
+                elif wm[0] == 'xfce4-session':
+                    default = 'terminal'
+                elif wm[0] == 'ksmserver':
+                    default = 'konsole'
+            if not default:
+                default = 'xterm'
+
+        TerminalSelector.default = default
+        return default
+
+
 class DjangoTestCommandBase(sublime_plugin.TextCommand):
 
     def get_test_command(self):
@@ -78,7 +138,7 @@ class DjangoTestCommandBase(sublime_plugin.TextCommand):
         virtualenv = self.view.settings().get(VIRTUALENV_SETTING, None)
         # User can override this with a setting if necessary. Otherwise, we'll
         # try to discover the Django project's root directory.
-        project_root = self.view.settings().get(DJANGO_PROJECT_ROOT_SETTINGS)
+        project_root = self.view.settings().get(DJANGO_PROJECT_ROOT_SETTING)
         full_test_command = None
 
         if project_root is None:
@@ -105,13 +165,13 @@ class DjangoTestCommandBase(sublime_plugin.TextCommand):
 
     def run_test_command(self, test_cmd, include_method=False):
         test_name = get_test_name(self.view, include_method)
-        package_dir = os.path.join(sublime.packages_path(), __name__)
+        terminal = self.view.settings().get(TEST_TERMINAL_SETTING, None)
 
         if test_name is None:
             return
 
         cmd = '"%s" "%s %s"' % (
-            TerminalSelector.get(package_dir), test_cmd, test_name)
+            TerminalSelector.get(terminal), test_cmd, test_name)
 
         return self.run_shell_command(cmd)
 
