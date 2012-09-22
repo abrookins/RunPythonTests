@@ -25,13 +25,14 @@ By default, the commands are:
 
 ## Settings
 
-The following setting is *required*:
+These settings are optional and work best inside of your project settings file:
 
 - "python_project_root"
 
-    The absolute path to the root directory of your project.
-
-These settings are optional and work best inside of your project settings file:
+    The absolute path to the root directory of your project. By default the
+    plugin will use the first directory that contains either the file
+    `settings.py` or `setup.py`, starting with the directory containing the test
+    you are trying to run
 
 - "python_test_mode"
 
