@@ -102,11 +102,15 @@ def get_test_name(view, mode, target='method'):
     """
     test_fn = get_current_test_function(view)
     test_cls = class_finder.find_class(view.file_name(), test_fn)
-    # XXX: This is a hack to find the package name.
-    package_name = find_file(['models.py', 'models'], view.file_name())
     test_name = None
 
-    # The path is, e.g., /one/two/three/app_name, so get `app_name`.
+    # XXX: This is a hack to find the package name. Instead we should backtrack
+    # from the test test file to the project dir and keep track of the immediate
+    # last package, then ue that package name.
+    package_name = find_file(['models.py', 'models'], view.file_name())
+
+    # Get the last directory in an absolute path, e.g. `app_name` in the path
+    # /one/two/three/app_name.
     if package_name:
         package_name = package_name.split(os.path.sep)[-1]
 
