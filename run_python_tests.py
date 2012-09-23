@@ -23,8 +23,7 @@ TEST_COMMAND_SETTING = 'python_test_command'
 TEST_MODULE_SETTING = 'python_test_module'
 TEST_TERMINAL_SETTING = 'python_test_terminal'
 VIRTUALENV_SETTING = 'python_virtualenv'
-
-python_tests_package_dir = os.path.dirname(os.path.abspath(__file__))
+PYTHON_TESTS_PACKAGE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 
 def find_file(filenames, starting_dir):
@@ -207,7 +206,7 @@ class TerminalSelector(object):
             dir, executable = os.path.split(terminal)
             if not dir:
                 joined_terminal = os.path.join(
-                    python_tests_package_dir, executable)
+                    PYTHON_TESTS_PACKAGE_DIR, executable)
                 if os.path.exists(joined_terminal):
                     terminal = joined_terminal
                     if not os.access(terminal, os.X_OK):
@@ -220,7 +219,7 @@ class TerminalSelector(object):
         default = None
 
         if sys.platform == 'darwin':
-            default = os.path.join(python_tests_package_dir, 'Terminal.sh')
+            default = os.path.join(PYTHON_TESTS_PACKAGE_DIR, 'Terminal.sh')
             if not os.access(default, os.X_OK):
                 os.chmod(default, 0755)
         else:
