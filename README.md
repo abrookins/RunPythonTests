@@ -9,7 +9,7 @@ external shell.
 
 ## Requirements
 
-There are a bit obvious, but:
+A bit obvious, but:
 
 - virtualenv and virtualenvwrapper are required for virtualenv support
 - nose is required for "nose" mode
