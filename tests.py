@@ -10,6 +10,20 @@ import unittest
 class UtilTests(unittest.TestCase):
 
     def setUp(self):
+        class MockView(object):
+            def file_name(self):
+                return os.path.join(
+                    settings.PYTHON_TESTS_PACKAGE_DIR,
+                    'test_files', 'test_app', 'tests.py')
+
+        self.mock_view = MockView()
+
+        self.mock_get_test_fn_1 = lambda view: 'test_1'
+        self.mock_get_test_fn_2 = lambda view: 'test_2'
+
+        def mock_get_current_test_function(view):
+            return 'fake_test_1'
+
         self.test_files_dir = os.path.join(settings.PYTHON_TESTS_PACKAGE_DIR,
                                            'test_files')
 
@@ -68,3 +82,10 @@ class UtilTests(unittest.TestCase):
     def test_get_setup_py_test_suite(self):
         test_name = util.get_setup_py_test('app', 'class', 'fn', 'suite')
         self.assertEqual(test_name, '')
+
+    def test_get_test_name(self):
+        orig_get_current_test_function = util.get_current_test_function
+        util.get_current_test_function = self.mock_get_test_fn_1
+        test_name = util.get_test_name(self.mock_view, 'django', 'method')
+        self.assertEqual(test_name, 'test_app.FakeTestClass.test_1')
+        util.get_current_test_function = orig_get_current_test_function

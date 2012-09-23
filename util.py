@@ -33,13 +33,13 @@ def find_file(filenames, starting_dir):
         return find_file(filenames, os.path.dirname(starting_dir))
 
 
-def get_current_test_function(view, entity_selector):
+def get_current_test_function(view):
     """
     Return the name of the first test function (a function that starts with
     'test_') found above the current line.
     """
     sel = view.sel()[0]
-    entities = view.find_by_selector(entity_selector)
+    entities = view.find_by_selector('entity.name.function')
     current_entity = None
 
     for e in reversed(entities):
@@ -97,17 +97,18 @@ def get_test_name(view, mode, target='method'):
     Using 'class' returns the name of the test class enclosing the test method
     in which the cursor rests.
 
-    Using 'suite' returns the name of the app, which should cause the test
-    runner to run the entire app's suite of tests.
+    Using 'suite' returns the name of the package, which should cause the test
+    runner to run the package's suite of tests.
     """
-    test_fn = get_current_test_function(view, 'entity.name.function')
+    test_fn = get_current_test_function(view)
     test_cls = class_finder.find_class(view.file_name(), test_fn)
-    app_name = find_file(['models.py', 'models'], view.file_name())
+    # XXX: This is a hack to find the package name.
+    package_name = find_file(['models.py', 'models'], view.file_name())
     test_name = None
 
     # The path is, e.g., /one/two/three/app_name, so get `app_name`.
-    if app_name:
-        app_name = app_name.split(os.path.sep)[-1]
+    if package_name:
+        package_name = package_name.split(os.path.sep)[-1]
 
     # Test functions must start with `test_`.
     if test_fn.startswith('test_') is False:
@@ -118,7 +119,7 @@ def get_test_name(view, mode, target='method'):
     if not formatter:
         return
 
-    test_name = formatter(app_name, test_cls, test_fn, target)
+    test_name = formatter(package_name, test_cls, test_fn, target)
 
     return test_name
 
