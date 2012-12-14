@@ -44,7 +44,7 @@ def find_project_root(filename):
     This is our best guess for the project root for ``filename``.
     """
     return find_dir_containing(
-        ['settings.py', 'setup.py'], os.path.dirname(filename))
+        ['settings.py', 'manage.py', 'setup.py'], os.path.dirname(filename))
 
 
 def find_package(filename):
@@ -65,7 +65,7 @@ def find_django_app_name(filename):
     app_dir = find_django_app_dir(filename)
 
     if app_dir:
-        return os.path.dirname(app_dir)
+        return app_dir.split(os.path.sep)[-1]
 
 
 def make_import_string(filename):
@@ -98,8 +98,11 @@ def get_current_test_function(view):
 def get_django_test(view, target):
     test_fn = get_current_test_function(view)
 
+    if not test_fn:
+        return
+
     # Test functions must start with `test_`.
-    if test_fn and test_fn.startswith('test_') is False:
+    if test_fn.startswith('test_') is False:
         return
 
     filename = view.file_name()
@@ -107,12 +110,17 @@ def get_django_test(view, target):
     app_name = find_django_app_name(filename)
     test_name = None
 
+    if not app_name or not test_cls:
+        return None
+
     if target == 'method':
         test_name = '%s.%s.%s' % (app_name, test_cls, test_fn)
     elif target == 'class':
         test_name = '%s.%s' % (app_name, test_cls)
     elif target == 'suite':
         test_name = app_name
+
+    print test_name
 
     return test_name
 
@@ -143,6 +151,9 @@ def get_nose_test(view, target):
 
 
 def get_setup_py_test(view, target):
+    """
+    TODO
+    """
     return ''
 
 
@@ -191,7 +202,6 @@ test_commands = {
 def get_test_command(mode, view_settings, filename):
     default_test_module = test_modules.get(mode, None)
     default_test_command = test_commands.get(mode, None)
-    project_root = None
 
     test_cmd = view_settings.get(
         settings.TEST_COMMAND_SETTING, default_test_command)
@@ -219,7 +229,7 @@ def get_test_command(mode, view_settings, filename):
 
     if virtualenv:
         full_test_command = 'venvwrapper && workon %s && %s %s' % (
-            virtualenv, full_test_command, test_cmd_options)
+            virtualenv, full_test_command, test_cmd_options or '')
 
     return full_test_command
 
