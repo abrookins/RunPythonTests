@@ -120,8 +120,6 @@ def get_django_test(view, target):
     elif target == 'suite':
         test_name = app_name
 
-    print test_name
-
     return test_name
 
 

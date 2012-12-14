@@ -50,10 +50,24 @@ class UtilTests(unittest.TestCase):
 
     def test_get_django_test_method(self):
         test_name = util.get_test_name(self.mock_view, 'django', 'method')
-        expected = '%s/test_files.FakeTestClass.test_fake' % \
-                   os.path.dirname(__file__)
-        self.assertEqual(expected, test_name)
+        self.assertEqual('test_app.FakeTestClass.test_fake', test_name)
+
+    def test_get_django_test_class(self):
+        test_name = util.get_test_name(self.mock_view, 'django', 'class')
+        self.assertEqual('test_app.FakeTestClass', test_name)
+
+    def test_get_django_test_suite(self):
+        test_name = util.get_test_name(self.mock_view, 'django', 'suite')
+        self.assertEqual('test_app', test_name)
 
     def test_get_nose_test_method(self):
         test_name = util.get_test_name(self.mock_view, 'nose', 'method')
         self.assertEqual('test_app.tests:FakeTestClass.test_fake', test_name)
+
+    def test_get_nose_test_class(self):
+        test_name = util.get_test_name(self.mock_view, 'nose', 'class')
+        self.assertEqual('test_app.tests:FakeTestClass', test_name)
+
+    def test_get_nose_test_suite(self):
+        test_name = util.get_test_name(self.mock_view, 'nose', 'suite')
+        self.assertEqual('test_app.tests', test_name)
