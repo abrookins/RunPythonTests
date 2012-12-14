@@ -9,12 +9,13 @@ import subprocess
 from terminal_selector import TerminalSelector
 
 
-def find_file(filenames, starting_dir):
+def find_dir_containing(filenames, starting_dir):
     """
     Recursively check the current and then parent directory for filenames in the
     iterable `filenames`, starting from `starting_dir`.
 
     Returns the directory containing one of `filenames` or None if not found.
+    The name should probably reflect this behavior.
     """
     exists = False
 
@@ -30,7 +31,51 @@ def find_file(filenames, starting_dir):
         # systems as '/'
         return None
     else:
-        return find_file(filenames, os.path.dirname(starting_dir))
+        return find_dir_containing(
+            filenames,
+            os.path.abspath(os.path.dirname(starting_dir)))
+
+
+def find_project_root(filename):
+    """
+    Return the name of the first directory up from ``filename`` that contains
+    either a `settings.py` or `setup.py` file.
+
+    This is our best guess for the project root for ``filename``.
+    """
+    return find_dir_containing(
+        ['settings.py', 'setup.py'], os.path.dirname(filename))
+
+
+def find_package(filename):
+    """
+    Return the package containing ``filename``.
+    """
+    return find_dir_containing(['__init__.py'], os.path.dirname(filename))
+
+
+def find_django_app_dir(filename):
+    """
+    Find the Django app directory containing ``filename``.
+    """
+    return find_dir_containing(['models.py', 'models'], filename)
+
+
+def find_django_app_name(filename):
+    app_dir = find_django_app_dir(filename)
+
+    if app_dir:
+        return os.path.dirname(app_dir)
+
+
+def make_import_string(filename):
+    """
+    Return a Python import string for ``filename`` that starts with the root
+    package ``root_package``.
+    """
+    path_parts = filename.split(os.path.sep)
+    import_string = '.'.join(path_parts)
+    return import_string.rstrip('.py')
 
 
 def get_current_test_function(view):
@@ -50,7 +95,16 @@ def get_current_test_function(view):
     return current_entity
 
 
-def get_django_test(app_name, test_cls, test_fn, target):
+def get_django_test(view, target):
+    test_fn = get_current_test_function(view)
+
+    # Test functions must start with `test_`.
+    if test_fn and test_fn.startswith('test_') is False:
+        return
+
+    filename = view.file_name()
+    test_cls = class_finder.find_class(filename, test_fn)
+    app_name = find_django_app_name(filename)
     test_name = None
 
     if target == 'method':
@@ -63,20 +117,32 @@ def get_django_test(app_name, test_cls, test_fn, target):
     return test_name
 
 
-def get_nose_test(app_name, test_cls, test_fn, target):
+def get_nose_test(view, target):
+    test_fn = get_current_test_function(view)
+
+    # Test functions must start with `test_`.
+    if test_fn and test_fn.startswith('test_') is False:
+        return
+
+    filename = view.file_name()
+    test_cls = class_finder.find_class(filename, test_fn)
+    project_root = find_project_root(filename)
+    filename = filename[len(project_root):]
+    filename = filename.lstrip(os.path.sep)
+    import_string = make_import_string(filename)
     test_name = None
 
     if target == 'method':
-        test_name = '%s.tests:%s.%s' % (app_name, test_cls, test_fn)
+        test_name = '%s:%s.%s' % (import_string, test_cls, test_fn)
     elif target == 'class':
-        test_name = '%s.tests:%s' % (app_name, test_cls)
+        test_name = '%s:%s' % (import_string, test_cls)
     elif target == 'suite':
-        test_name = "%s.tests" % app_name
+        test_name = import_string
 
     return test_name
 
 
-def get_setup_py_test(app_name, test_cls, test_fn, target):
+def get_setup_py_test(view, target):
     return ''
 
 
@@ -100,30 +166,12 @@ def get_test_name(view, mode, target='method'):
     Using 'suite' returns the name of the package, which should cause the test
     runner to run the package's suite of tests.
     """
-    test_fn = get_current_test_function(view)
-    test_cls = class_finder.find_class(view.file_name(), test_fn)
-    test_name = None
-
-    # XXX: This is a hack to find the package name. Instead we should backtrack
-    # from the test test file to the project dir and keep track of the immediate
-    # last package, then ue that package name.
-    package_name = find_file(['models.py', 'models'], view.file_name())
-
-    # Get the last directory in an absolute path, e.g. `app_name` in the path
-    # /one/two/three/app_name.
-    if package_name:
-        package_name = package_name.split(os.path.sep)[-1]
-
-    # Test functions must start with `test_`.
-    if test_fn.startswith('test_') is False:
-        return
-
     formatter = test_formats.get(mode, None)
 
     if not formatter:
         return
 
-    test_name = formatter(package_name, test_cls, test_fn, target)
+    test_name = formatter(view, target)
 
     return test_name
 
@@ -143,9 +191,11 @@ test_commands = {
 def get_test_command(mode, view_settings, filename):
     default_test_module = test_modules.get(mode, None)
     default_test_command = test_commands.get(mode, None)
+    project_root = None
 
     test_cmd = view_settings.get(
         settings.TEST_COMMAND_SETTING, default_test_command)
+    test_cmd_options = view_settings.get(settings.TEST_COMMAND_OPTIONS_SETTING)
     test_module = view_settings.get(
         settings.TEST_MODULE_SETTING, default_test_module)
 
@@ -161,17 +211,15 @@ def get_test_command(mode, view_settings, filename):
         project_root = view_settings.get(settings.PYTHON_PROJECT_ROOT_SETTING)
 
         if project_root is None:
-            project_root = find_file(
-                ['settings.py', 'setup.py'],
-                os.path.dirname(filename))
+            project_root = find_project_root(filename)
 
         if project_root:
             full_test_command = 'python %s %s' % (
                 os.path.join(project_root, test_module), test_cmd)
 
     if virtualenv:
-        full_test_command = 'venvwrapper && workon %s && %s' % (
-            virtualenv, full_test_command)
+        full_test_command = 'venvwrapper && workon %s && %s %s' % (
+            virtualenv, full_test_command, test_cmd_options)
 
     return full_test_command
 
